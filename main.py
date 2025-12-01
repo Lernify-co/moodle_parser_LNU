@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import (
     sync_playwright,
     Page,
+    TimeoutError as PlaywrightTimeoutError,
 )
 
 MOODLE_BASE = "https://moodle.elct.lnu.edu.ua"
@@ -719,7 +720,7 @@ def scrape_everything() -> Dict[str, Any]:
     """
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
+        context = browser.new_context(ignore_https_errors=True)
         page = context.new_page()
 
         # 1. Логін
@@ -727,7 +728,12 @@ def scrape_everything() -> Dict[str, Any]:
 
         # 2. HTML дашборду
         print("[+] Знімаю HTML з дашборду...")
-        page.goto(DASHBOARD_URL)
+        try:
+            page.goto(DASHBOARD_URL, wait_until="domcontentloaded", timeout=60000)
+        except PlaywrightTimeoutError:
+            print("[!] Таймаут при відкритті дашборду, беру HTML з поточної сторінки")
+        except Exception as e:
+            print(f"[!] Помилка при відкритті дашборду {DASHBOARD_URL}: {e}")
         time.sleep(2)
         dashboard_html = page.content()
 
